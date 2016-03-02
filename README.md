@@ -54,8 +54,8 @@ model is some health measurement or the survival time and the covariate is the
 is the survival time of patients in days from treatment start and as base model
 we use a Weibull model.  
 
-Rather than giving treatment effects within subgroups -- as is the case in
-model-based recursive partitioning -- we want go one step further and estimate
+Rather than giving treatment effects within subgroups - as is the case in
+model-based recursive partitioning - we want go one step further and estimate
 personalised treatment effects here. To be able to do this, in a first step we
 compute random forests based on multiple model-based trees t=1,...,T. Each
 tree is based on a subsample of the learning data and a
