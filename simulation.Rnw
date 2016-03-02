@@ -1,0 +1,234 @@
+\documentclass{article}
+\usepackage[left=20mm, right=15mm, top=15mm, bottom=20mm]{geometry}
+
+\begin{document}
+%\VignetteEngine{knitr::knitr}
+<<setup>>=
+library("knitr")
+opts_chunk$set(cache = FALSE, echo = TRUE, message = FALSE)
+
+library("partykit")
+library("sandwich")
+library("plyr")
+library("mvtnorm")
+library("ggplot2")
+theme_set(theme_bw(base_size = 18))
+
+
+source("basis/personalised_models.R")
+source("basis/variable_importance.R")
+source("basis/dependence_plots.R")
+
+set.seed(123)
+@
+
+\section{Simulation of data}
+<<datasimulation>>=
+sim_data <- function(n = 500, p = 10, beta = 3, sd = 1){
+  
+  lev <- c("C", "A")
+  a <- rep(factor(lev, labels = lev, levels = lev), length = n)
+  
+  ## z variables are correlated
+  sigma <- diag(p) 
+  sigma[sigma == 0] <- 0.2
+  ztemp <- rmvnorm(n, sigma = sigma)
+  z <- (pnorm(ztemp) * 2 * pi) - pi  
+  
+#   z <- matrix(runif(p * n, min = -pi, max = pi), nrow = n)
+  colnames(z) <- paste0("z", 1:ncol(z))
+  z1 <- z[,1]
+   
+  y <- 1.9 + 0.2 * (a %in% "A") + beta * cos(z1) * (a %in% "A") + rnorm(n, 0, sd)
+  
+  data.frame(y = y, a = a, z)
+}
+
+@
+
+
+\section{The function needed for fitting the cforest}
+<<lm_fittingfunction>>=
+##' fitting function for cforest with linear model
+lmf <- function(data, weights, parm = c(1,2)) {
+  
+  tb <- table(data[["a"]][weights > 0])
+  ## only one treatment arm left (or only one observation in one treatment arm); 
+  ## we don't want to split further...
+  if (any(tb < 2)) return(matrix(0, nrow = nrow(data), ncol = length(parm)))
+  
+  mod <- lm(y ~ a, weights = weights, data = data, subset = weights > 0)
+  ef <- as.matrix(estfun(mod)[, parm])
+  ret <- matrix(0, nrow = nrow(data), ncol = ncol(ef))
+  ret[weights > 0,] <- ef
+  ret
+}
+@
+
+
+\section{Computing individualised models}
+
+\Sexpr{knit_child("personalised_models.Rnw")}
+
+<<sind_mods>>=
+beta <- 3
+train <- sim_data(p = 10, beta = beta, n = 600)
+Z <- names(train)[!(names(train) %in% c("y", "a"))]
+cfm <- as.formula(paste("y + a ~", paste(Z, collapse = "+")))
+
+lmforest <-  cforest(cfm, data = train, ytrafo = lmf, ntree = 100, cores = 1, 
+                     perturb = list(replace = FALSE),
+                     control = ctree_control(teststat = "quad",
+                                testtype = "Univ", mincriterion = 0, minbucket = 20))
+pmods <- person_mods(object = lmforest, basemod = "lm", newdata = train[1:5,], 
+                     OOB = FALSE, parallel = TRUE)
+
+(pcoefs <- t(sapply(pmods, coef)))
+
+@
+
+
+\section{Function which computes log-likelihoods for simulated data}
+
+<<sim_complogliks>>=
+##' simulation for cforest check
+##' comparison with two linear models
+##' (1) lm(y ~ a, data = train)
+##' (2) lm(y ~ a * I(z1 > 0), data = train)
+##' @param i unused
+##' @param data list of 2 list(train, test). If NULL training data of size n and test data of size m are obtained.
+sim_wi <- function(i, data = NULL, n = 600, m = 600, p = 10, beta = 3,
+                   person.mods = FALSE){
+  
+  if(is.null(data)) {
+    data <- sim_data(n = (n + m), p = p, beta = beta)
+    train <- data[1:n, ]
+    test <- data[(n+1):(n+m), ]
+  } else {
+    train <- data$train
+    test <- data$test
+  }
+    
+  Z <- names(train)[!(names(train) %in% c("y", "a"))]
+  
+  
+  ### linear model 1 ############################
+  lm1 <- lm(y ~ a, data = train)
+  loglik1 <- sum(comp_loglik.lm(lm1, test, response = "y"))
+  
+  
+  ### linear model 1 ############################
+  lm2 <- lm(y ~ a * cos(z1), data = train)
+  loglik2 <- sum(comp_loglik.lm(lm2, test, response = "y"))
+  
+  ### linear model random forest ################
+  cfm <- as.formula(paste("y + a ~", paste(Z, collapse = "+")))
+  lmforest <-  cforest(cfm, data = train, ytrafo = lmf, ntree = 100, cores = 50, 
+                       perturb = list(replace = FALSE))
+  
+  mods <- person_mods(object = lmforest, basemod = "lm", newdata = test)
+  logLiksf <- sapply(1:nrow(test), comp_loglik, mods = mods, dat = test, 
+                     basemod = "lm", loglik = NULL)
+  loglikf <- sum(logLiksf)
+  
+  
+  if (person.mods == TRUE) {
+    pm <- cbind(t(sapply(mods, coef)), test)
+    return(list(logliks = c(loglik1, loglik2, loglikf),
+                person.mods = pm))
+  } else {
+    return(c(loglik1, loglik2, loglikf))
+  }
+  
+  
+  
+}
+@
+
+\section{Log-likelihoods for simulated data for the three methods}
+
+\Sexpr{knit_child("log_likelihoods.Rnw")}
+
+<<slogliks, out.width = "0.6\\textwidth", out.height = "0.6\\textwidth">>=
+logliks.pm <- lapply(1:100, sim_wi, person.mods = TRUE)
+logliks <- t(sapply(logliks.pm, function(x) x$logliks))
+llnames <- c("incorrect model", "correct model", "model based forest")
+colnames(logliks) <- llnames
+logliks
+
+logliks_gg <- data.frame(id = rep(1:nrow(logliks), times = 3),
+                         nam = rep(llnames, each = nrow(logliks)), 
+                         loglik = unlist(as.list(logliks)))
+
+ggplot(logliks_gg, aes(x = nam, y = loglik)) + 
+  geom_boxplot() +
+  geom_line(aes(group = id), alpha = 0.2) +
+  xlab("") + ylab("log-likelihood") +
+  theme(panel.grid.major.x = element_blank())
+@
+
+
+\section{Variable importance}
+
+\Sexpr{knit_child("variable_importance.Rnw")}
+
+<<svarimp, out.width = "0.7\\textwidth", out.height = "0.7\\textwidth">>=
+###### variable importance ######
+
+## beta = 3
+# train <- sim_data(p = 10, beta = 3, n = 500)
+# Z <- names(train)[!(names(train) %in% c("y", "a"))]
+# cfm <- as.formula(paste("y + a ~", paste(Z, collapse = "+")))
+# lmforest <-  cforest(cfm, data = train, ytrafo = lmf, ntree = 100, cores = 1, 
+#                      perturb = list(replace = FALSE))
+
+VI <- varimp(forest = lmforest, loglik = comp_loglik.lm, 
+             basemod = "lm", OOB = TRUE, parallel = TRUE)
+ 
+# VI <- varimp(variables = Z, forest = lmforest, loglik_forest = NULL, 
+#              basemod = "lm", loglik = comp_loglik.lm)
+VI
+
+text.z <- sapply(Z, function(x) bquote(z[.(gsub("z", "", x))]))
+VI$variable <- factor(VI$variable, levels = Z)
+
+
+ggplot(VI, aes(y = VI, x = variable)) + geom_bar(stat = "identity", width = .1) + 
+  coord_flip() + scale_x_discrete(labels = text.z) +
+  theme(panel.grid.major.y = element_blank())
+
+@
+
+\section{Partial dependence plots}
+With out of sample data.
+\Sexpr{knit_child("partial_dependence_plots.Rnw")}
+
+<<spdplots, out.width = "0.5\\textwidth", out.height = "0.4\\textwidth", fig.show='hold', message=FALSE>>=
+###### partial dependence plots ######
+ggplot(data = train, aes(x = z1, y = (0.2 + beta * cos(z1)) * (a %in% "A"), group = a)) +
+  geom_line() + ylab(expression(beta(z[1]))) +  xlab(bquote(z[.(gsub("z", "", Z[1]))])) 
+
+
+# personalized models
+library(plyr)
+pd <- ldply(1:length(logliks.pm), 
+               function(i) {
+                 logliks.pm[[i]]$person.mods$iteration <- i
+                 return(logliks.pm[[i]]$person.mods)
+                 })
+
+pd$iteration <- as.factor(pd$iteration)
+
+
+dependenceplot.sim <- function(variable, treatment) {
+  ggplot(data = pd, aes_string(x = variable, y = treatment)) + 
+        geom_point(alpha = 0.1) + 
+        xlab(bquote(z[.(gsub("z", "", variable))])) + 
+        ylab(bquote(bar(beta)(z[.(gsub("z", "", variable))])))+ 
+        xlim(-pi, pi) + ylim(-pi, pi)              
+}
+lapply(Z, dependenceplot.sim, treatment = "aA")
+
+@
+
+\end{document}

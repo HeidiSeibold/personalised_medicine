@@ -1,0 +1,77 @@
+\documentclass{article}
+\usepackage[left=20mm, right=15mm, top=15mm, bottom=20mm]{geometry}
+
+\begin{document}
+%\VignetteEngine{knitr::knitr}
+<<surv_setup>>=
+library("knitr")
+opts_chunk$set(cache = FALSE, echo = TRUE,  
+               fig.show='hold', message=FALSE, warning=FALSE)
+
+library("ggplot2")
+theme_set(theme_bw(base_size = 18))
+library("partykit")
+library("sandwich")
+library("survival")
+library("eha")
+library("ggplot2")
+library("plyr")
+library("gridExtra")
+source("basis/personalised_models.R")
+source("basis/variable_importance.R")
+source("basis/dependence_plots.R")
+source("basis/pruning.R")
+
+
+
+read_chunk('ALSsurv_R.R')
+@
+
+
+<<surv_data, cache = TRUE>>=
+@
+
+\section{Fitting function}
+<<surv_fittingfunction, cache = TRUE>>=
+@
+
+\section{Compute random forest}
+<<surv_forest, cache = TRUE, dependson = c("surv_data", "surv_fittingfunction")>>=
+@
+
+
+\section{Obtain personalised models}
+<<surv_pm, out.width = "0.99\\textwidth", out.height = "0.33\\textwidth", fig.width=12, fig.height=4>>=
+@
+
+
+\section{Obtain log-Likelihoods}
+<<surv_logLiks, cache = TRUE, dependson = "surv_forest">>=
+@
+
+<<surv_bootstrapLogliks, dependson = c("surv_data", "surv_fittingfunction")>>=
+@
+
+\section{Variable importance}
+<<surv_varimp, depenson = c("surv_forest")>>=
+@
+
+%
+%\section{Rank plot}
+%<<surv_rankplot, fig.height = 11>>=
+%@
+%
+%\section{Partial dependency plots}
+%<<surv_pdplot, out.width = "0.5\\textwidth", out.height = "0.4\\textwidth">>=
+%@
+%
+%From dependence plot make out useful variables for a model.
+%<<surv_newmodel>>=
+%@
+%
+
+<<surv_sessionInfo>>=
+sessionInfo()
+@
+
+\end{document}

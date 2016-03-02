@@ -1,0 +1,14 @@
+We compute variable importances using the log-likelihoods and the idea that the
+higher the likelihood the better.
+
+\begin{itemize}
+	\item Obtain log-likelihood for a given forest.
+	\item Permute one variable in the training data and recompute the
+forest and the likelihood.
+	\item Give the variable importance as the difference between likelihood
+of the forest and the likelihood of the forest with the permuteda respective variable.
+\end{itemize}
+
+Hence a variable that has an important effect causes the model to become much
+worse when it is permuted. A variable with no impact at all corresponds to no
+change in the likelihood.

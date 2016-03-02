@@ -1,0 +1,23 @@
+By using the personalised models one can obtain a likelihood for a random forest. Instead of using new data here the training data is used to compute the personalised models.
+
+\begin{itemize}
+	\item Obtain personalised models using out-of-bag prediction weights.
+<<eval = FALSE>>=
+weights <- predict(object, type = "weights", newdata = traindata, OOB = TRUE)
+model <- lm(y ~ a, weights = weights, data = data)
+@
+
+	\item For each data point and the corresponding model compute the
+log-likelihood contribution.
+<<eval = FALSE>>=
+y <- datapoint[, response]
+yhat <- predict(model, newdata = datapoint)
+llcontribution <- (yhat - y)^2
+@
+
+	\item Compute log-likelihood of the forest as the negative sum of the contributions.
+<<eval = FALSE>>=
+loglik <- -sum(llcontributions)
+@
+
+\end{itemize}

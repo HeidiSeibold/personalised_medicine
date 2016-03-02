@@ -1,0 +1,72 @@
+\documentclass{article}
+\usepackage[left=20mm, right=15mm, top=15mm, bottom=20mm]{geometry}
+
+\begin{document}
+%\VignetteEngine{knitr::knitr}
+<<setup, cache=FALSE>>=
+library("knitr")
+opts_chunk$set(cache = FALSE, echo = TRUE,  
+               fig.show='hold', message=FALSE, warning=FALSE)
+
+ca <- FALSE
+
+library("ggplot2")
+theme_set(theme_bw(base_size = 18))
+library("partykit")
+library("sandwich")
+library("gridExtra")
+library("plyr")
+source("ALSFRS_basis.R")
+source("basis/personalised_models.R")
+source("basis/pruning.R")
+source("basis/variable_importance.R")
+
+read_chunk('ALSFRS_R.R')
+@
+
+
+
+<<data, cache = ca, dependson = "setup">>=
+@
+
+
+
+\section{Compute random forest}
+<<forest, cache = ca, dependson = "data">>=
+@
+
+
+\section{Obtain personalised models}
+<<pm, out.width = "0.66\\textwidth", out.height = "0.33\\textwidth", fig.width=8, fig.height=4, cache = FALSE, dependson = "forest">>=
+@
+
+
+\section{Obtain log-Likelihoods}
+<<logLiks, cache = ca, dependson = "forest">>=
+@
+
+
+<<bootstrapLogliks, cache = ca, dependson = "data">>=
+@
+
+
+\section{Variable importance}
+<<varimp, fig.height=11, cache = ca, depenson = "forest">>=
+@
+
+%
+%\section{Rankplot}
+%<<rankplot, fig.height=11>>=
+%@
+%
+%
+%\section{Partial dependency plots}
+%<<pdplot, out.width = "0.5\\textwidth", out.height = "0.4\\textwidth">>=
+%@
+%
+
+<<sessionInfo>>=
+sessionInfo()
+@
+
+\end{document}

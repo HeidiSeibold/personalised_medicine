@@ -1,0 +1,6 @@
+A partial dependence plot describes the the depence of a function - in our case
+the treatment effect - and a variable - in our case a partitioning variable.
+The partial dependence plot resulting from a model-based tree would show a step
+function. The partial dependence from a random forest can be more smooth. It
+can be obtained by ploting $\bar{\beta}(z_{ij}) = \frac{1}{N} \sum\limits_{i=1}^N
+\hat{\beta}(z_i)$ against $z_{ij}$.

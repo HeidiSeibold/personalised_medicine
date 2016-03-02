@@ -1,0 +1,22 @@
+Using our approach it is possible to compute personalised models for each
+individual. This is relevant to predict the treatment effect of a new patient.
+This is an easy rule to decide if the treatment should be given to a person or
+not.
+\begin{itemize}
+	\item Compute model-based forest.
+
+	\item Obtain prediction weights for a new observation. The weights are
+a measure of similarity between the new observation and every observation in
+the training set. The weight vector hence has length $N$. Each weight is given
+as the number of times the new observation is sorted into the same leaf node as
+each of the training observations. 
+<<eval = FALSE>>=
+weights <- predict(object, type = "weights", newdata = newdata, OOB = FALSE)
+@
+
+	\item Compute base model using the weighted training set.
+<<eval = FALSE>>=
+model <- lm(y ~ a, weights = weights, data = data)
+@
+
+\end{itemize}
