@@ -56,6 +56,26 @@ names(ALSFRSdata) <- gsub("fam.hist.", "family_history_", names(ALSFRSdata))
 dim(ALSFRSdata)
 save(ALSFRSdata, file = "../data/ALSFRSdata.rda")
 
+## ---- fittingfunction --------------------------------------------------------------
+##' fitting function for glm with offset and log-link
+##' @param data ALSFRS data
+##' @param weights weights
+##' @param parm which parameters are we interested in. c(1,2) corresponds to intercept and Riluzole parameter.
+my.lmlog <- function(data, weights, parm = c(1,2)) {
+  
+  tb <- table(data[["Riluzole"]][weights > 0])
+  ## only one treatment arm left; we don't want to split further...
+  # if (any(tb == 0)) return(matrix(0, nrow = nrow(data), ncol = length(parm)))
+  if (any(tb < 5)) return(matrix(0, nrow = nrow(data), ncol = length(parm)))
+  
+  mod <- glm(ALSFRS.halfYearAfter ~ Riluzole + offset(log(ALSFRS.Start)), 
+             weights = weights, data = data, subset = weights > 0, 
+             family = gaussian(link = "log"), start = c(-0.159, 0.009)) # start from base model
+  ef <- as.matrix(estfun(mod)[, parm])
+  ret <- matrix(0, nrow = nrow(data), ncol = ncol(ef))
+  ret[weights > 0,] <- ef
+  ret
+}
 
 
 ## ----forest ------------------------------------------------------------

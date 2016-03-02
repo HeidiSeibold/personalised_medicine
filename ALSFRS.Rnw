@@ -30,6 +30,10 @@ read_chunk('ALSFRS_R.R')
 @
 
 
+\section{Fitting function}
+<<fittingfunction, cache = TRUE>>=
+@
+
 
 \section{Compute random forest}
 <<forest, cache = ca, dependson = "data">>=
