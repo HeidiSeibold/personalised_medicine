@@ -1,6 +1,6 @@
 # Personalised Medicine
 
-This repository is the code to our paper on personalised medicine.
+This repository contains the code to our paper on personalised medicine.
 
 We propose model-based random forests as a method to detect
 similarities between patients with respect to their treatment effect
