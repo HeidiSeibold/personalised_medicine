@@ -12,6 +12,8 @@ others.
 
 We use the *partykit* package (especially functions `cforest()` and `predict.cforest()`) and parametric 
 models such as `survreg()` from package *survival* or `glm()`.
+In Order to run the code please download the data from https://nctu.partners.org/ProACT and run the
+corresponding demo from the R package *TH.data*. Store the data in a subfolder called /data.
 
 
 ## Background and aim
