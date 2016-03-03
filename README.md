@@ -79,5 +79,7 @@ treatment against the single patient characteristics, give us an idea on the
 connection between the two. 
 
 
-:clock5: Seibold, H., Zeileis, A. and Hothorn, T. (accepted 2015-10-02). Model-based
-recursive partitioning for subgroup analyses. International Journal of Biostatistics.
+
+
+:clock5: *Seibold, H., Zeileis, A. and Hothorn, T. (accepted 2015-10-02). Model-based
+recursive partitioning for subgroup analyses. International Journal of Biostatistics.*
