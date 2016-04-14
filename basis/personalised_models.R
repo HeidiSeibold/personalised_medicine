@@ -165,6 +165,6 @@ plot_param <- function(parameter, dat) {
   dat <- as.data.frame(dat)
   npar <- gsub("\\(|\\)", "", parameter)
   names(dat)[names(dat) == parameter] <- npar
-  ggplot(dat, aes_string(x = npar)) + geom_line(stat = "density") + # geom_density() + 
+  ggplot() + geom_line(data = dat, stat = "density", aes_string(x = npar)) + # geom_density() + 
 	ylab("")
 }

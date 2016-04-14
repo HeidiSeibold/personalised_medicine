@@ -160,6 +160,8 @@ logliks_gg <- data.frame(id = rep(1:nrow(logliks), times = 3),
                          nam = rep(llnames, each = nrow(logliks)), 
                          loglik = unlist(as.list(logliks)))
 
+save(logliks_gg, file = "sim_logliks.rda")
+
 ggplot(logliks_gg, aes(x = nam, y = loglik)) + 
   geom_boxplot() +
   geom_line(aes(group = id), alpha = 0.2) +
@@ -192,6 +194,7 @@ VI
 text.z <- sapply(Z, function(x) bquote(z[.(gsub("z", "", x))]))
 VI$variable <- factor(VI$variable, levels = Z)
 
+save(VI, file = "sim_varimp.rda")
 
 ggplot(VI, aes(y = VI, x = variable)) + geom_bar(stat = "identity", width = .1) + 
   coord_flip() + scale_x_discrete(labels = text.z) +
@@ -209,6 +212,7 @@ ggplot(data = train, aes(x = z1, y = (0.2 + beta * cos(z1)) * (a %in% "A"), grou
   geom_line() + ylab(expression(beta(z[1]))) +  xlab(bquote(z[.(gsub("z", "", Z[1]))])) 
 
 
+
 # personalized models
 library(plyr)
 pd <- ldply(1:length(logliks.pm), 
@@ -219,6 +223,8 @@ pd <- ldply(1:length(logliks.pm),
 
 pd$iteration <- as.factor(pd$iteration)
 
+save(train, file = "sim_traindat.rda")
+save(Z, pd, file = "sim_dependenceplotdat.rda")
 
 dependenceplot.sim <- function(variable, treatment) {
   ggplot(data = pd, aes_string(x = variable, y = treatment)) + 

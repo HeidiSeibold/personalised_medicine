@@ -86,7 +86,6 @@ set.seed(1234)
 Z <- names(ALSFRSdata)[!(names(ALSFRSdata) %in% c("ALSFRS.halfYearAfter", "Riluzole", "ALSFRS.Start"))]
 fm <- as.formula(paste("ALSFRS.halfYearAfter + Riluzole + ALSFRS.Start ~ ", paste(Z, collapse = "+")))
 
-# trace("cforest", quote( message(print(which(sapply(forest, function(x) inherits(x, "partynode")) == FALSE))) ), at = 27, print = TRUE)
 
 ### forest
 ## with cores != NULL, not reproducible (seed depends on parallel)
@@ -115,12 +114,6 @@ cf <- t(sapply(mods, coef))
 summary(cf)
 colnames(cf) <- gsub("\\(|\\)|Yes", "", colnames(cf))
 
-#densp <- lapply(colnames(cf), plot_param, dat = cf)
-
-#grid.arrange(densp[[1]] + xlab(bquote(alpha)) + annotate("text", x = coef(bmod)["(Intercept)"], y = 0, label = "alpha", parse = TRUE),
-#             densp[[2]] + xlab(bquote(beta)) + annotate("text", x = coef(bmod)["RiluzoleYes"], y = 0, label = "beta", parse = TRUE),
-#             nrow = 1, left = "density")
-
 
 save(cf, file = "ALSFRS_personalModels.rda")
 
@@ -137,17 +130,61 @@ ggplot(cf, aes(x = Intercept, y = Riluzole, color = weakness)) + geom_point()
 
 ## ----logLiks------------------------------------------------------------
 message("logliks")
-### logLik
+set.seed(5)
+
+## forest
 logLiks <- sapply(1:nrow(ALSFRSdata), comp_loglik, mods = mods, dat = ALSFRSdata, 
                   basemod = "glm", loglik = comp_loglik.ALSFRS)
 
+## base model
 logLik_bmod <- sum(comp_loglik.ALSFRS(mod = bmod, ndat = ALSFRSdata))
 (logLik_rf <- sum(logLiks))
 
 
-save(logLik_bmod, logLik_rf, file = "ALSFRS_logLiks.rda")
+## forest with splits in alpha
+my.lmlog_alpha <- function(data, weights, parm = c(1)) {
+  my.lmlog(data, weights, parm)
+}
+forest_alpha <-  cforest(fm, data = ALSFRSdata, ytrafo = my.lmlog_alpha, 
+                   ntree = 100, cores = NULL, 
+                   perturb = list(replace = FALSE),
+                   control = ctree_control(teststat = "max", testtype = "Univ",
+                                           mincriterion = 0.95, minsplit = 40, minbucket = 30))
+forest_alpha <- prune_forest(forest_alpha, endpoint = "numeric")
+
+mods_alpha <- person_mods(forest_alpha, basemod = "glm", newdata = NULL, OOB = TRUE, 
+                    offset = "log(ALSFRS.Start)", family = gaussian(link = "log"),
+                    parallel = TRUE)
+logLiks_alpha <- sapply(1:nrow(ALSFRSdata), comp_loglik, mods = mods_alpha, dat = ALSFRSdata, 
+                  basemod = "glm", loglik = comp_loglik.ALSFRS)
+logLik_rf_alpha <- sum(logLiks_alpha)
+
+
+## forest with splits in beta
+my.lmlog_beta <- function(data, weights, parm = c(1)) {
+  my.lmlog(data, weights, parm)
+}
+forest_beta <-  cforest(fm, data = ALSFRSdata, ytrafo = my.lmlog_beta, 
+                         ntree = 100, cores = NULL, 
+                         perturb = list(replace = FALSE),
+                         control = ctree_control(teststat = "max", testtype = "Univ",
+                                                 mincriterion = 0.95, minsplit = 40, minbucket = 30))
+forest_beta <- prune_forest(forest_beta, endpoint = "numeric")
+
+mods_beta <- person_mods(forest_beta, basemod = "glm", newdata = NULL, OOB = TRUE, 
+                          offset = "log(ALSFRS.Start)", family = gaussian(link = "log"),
+                          parallel = TRUE)
+logLiks_beta <- sapply(1:nrow(ALSFRSdata), comp_loglik, mods = mods_beta, dat = ALSFRSdata, 
+                        basemod = "glm", loglik = comp_loglik.ALSFRS)
+logLik_rf_beta <- sum(logLiks_beta)
+
+
+save(logLik_bmod, logLik_rf, logLik_rf_alpha, logLik_rf_beta, 
+     file = "ALSFRS_logLiks.rda")
 
 rm(mods)
+rm(mods_alpha)
+rm(mods_beta)
 
 
 
@@ -227,36 +264,6 @@ ggplot(bootstrapped.logliks) +
   
   
 
-# for(b in 1:B) {
-#   message(b)
-#   ## get bootstrap sample
-#   bssample <- sample(1:nrow(ALSFRSdata), replace = TRUE)
-#   bsdata <- ALSFRSdata[bssample, ]
-#   
-#   
-#   ## compute forest log-likelihood on bootstrap sample
-#   message("compute forest")
-#   bsforest <-  cforest(fm, data = bsdata, ytrafo = my.lmlog, 
-#                        ntree = 100, cores = NULL, 
-#                        perturb = list(replace = FALSE),
-#                        control = ctree_control(teststat = "max", testtype = "Univ",
-#                                            mincriterion = 0.95, minsplit = 40, minbucket = 30))
-#   bsforest <- prune_forest(bsforest, endpoint = "numeric")
-#   
-#   message("compute personalized models")
-#   bsmods <- person_mods(bsforest, basemod = "glm", newdata = NULL, OOB = TRUE, 
-#                         offset = "log(ALSFRS.Start)", family = gaussian(link = "log"),
-#                         parallel = TRUE)
-#   message("compute logliks")
-#   bootstrapped.logliks[b, 2] <- sum(sapply(1:nrow(bsdata), comp_loglik, mods = bsmods, dat = bsdata, 
-#                                            basemod = "glm", loglik = comp_loglik.ALSFRS))
-#   
-#   ## compute base model log-likelihood on bootstrap sample
-#   bsbmod <- glm(ALSFRS.halfYearAfter ~ Riluzole + offset(log(ALSFRS.Start)),
-#                 data = bsdata, family = gaussian(link = "log"))
-#   bootstrapped.logliks[b, 1] <- sum(comp_loglik.ALSFRS(mod = bsbmod, ndat = bsdata))
-#   
-# }
 
 save(bootstrapped.logliks, file = "ALSFRS_bootstrapLogLiks.rda")
 

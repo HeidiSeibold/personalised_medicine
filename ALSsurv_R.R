@@ -48,12 +48,10 @@ save(ALSsurvdata, file = "../data/ALSsurvdata.rda")
 my.wb <- function(data, weights, parm = c(1, 2, 3)) {
   
   tb <- table(data[weights > 0, c("cens", "Riluzole")])
-#   print(tb)
   ## only one treatment arm left; we don't want to split further...
   if (!("1" %in% rownames(tb)) || any(tb["1", ] <  5) || sum(tb["1", ]) < 10) 
     return(matrix(0, nrow = nrow(data), ncol = length(parm)))
   
-#   if(any(tb < 7)) browser()
   
   mod <- survreg(Surv(survival.time, cens) ~ Riluzole, data = data, 
                  weights = weights, subset = weights > 0, dist = "weibull",
@@ -122,6 +120,7 @@ ggplot(data = cf_surv, aes(x = logscale, y = logshape, color = Riluzole)) +
 
 
 ## ----surv_varimp--------------------------------------------------------------
+set.seed(444)
 VI <- varimp(forest = survforest, basemod = "survreg", loglik = comp_loglik.wb, 
              OOB = TRUE, parallel = TRUE)
 VI$variable <- factor(VI$variable, levels = VI$variable[order(VI$VI)])
@@ -173,18 +172,57 @@ rm(a)
 rm(b)
 
 ## ----surv_logLiks-------------------------------------------------------------
+set.seed(5)
 
+## forest
 logLiks <- sapply(1:nrow(ALSsurvdata), comp_loglik, mods = mods, dat = ALSsurvdata, 
                   basemod = "survreg", loglik = comp_loglik.wb)
 
+## base model
 logLik_bmod_surv <- sum(comp_loglik.wb(mod = bmod, ndat = ALSsurvdata))
 (logLik_rf_surv <- sum(logLiks))
 
-save(logLik_bmod_surv, logLik_rf_surv, file = "ALSsurv_logLiks.rda")
+
+## forest with splits in alpha_1 and alpha_2
+my.wb_alpha <- function(data, weights, parm = c(1, 3)) {
+  my.wb(data, weights, parm)
+}
+survforest_alpha <-  cforest(fm, data = ALSsurvdata, ytrafo = my.wb_alpha, ntree = 100, cores = NULL, 
+                             perturb = list(replace = FALSE),
+                             control = ctree_control(teststat = "max", testtype = "Univ",
+                                                     mincriterion = 0.95, minsplit = 40, minbucket = 30))
+survforest_alpha <- prune_forest(survforest_alpha)
+mods_alpha <- person_mods(survforest_alpha, basemod = "survreg", newdata = NULL, OOB = TRUE, 
+                          parallel = TRUE, init = c(6.7, 0))
+
+logLiks_alpha <- sapply(1:nrow(ALSsurvdata), comp_loglik, mods = mods_alpha, dat = ALSsurvdata, 
+                        basemod = "survreg", loglik = comp_loglik.wb)
+(logLik_rf_surv_alpha <- sum(logLiks_alpha))
+
+## forest with splits in beta
+my.wb_beta <- function(data, weights, parm = c(2)) {
+  my.wb(data, weights, parm)
+}
+survforest_beta <-  cforest(fm, data = ALSsurvdata, ytrafo = my.wb_beta, ntree = 100, cores = NULL, 
+                             perturb = list(replace = FALSE),
+                             control = ctree_control(teststat = "max", testtype = "Univ",
+                                                     mincriterion = 0.95, minsplit = 40, minbucket = 30))
+survforest_beta <- prune_forest(survforest_beta)
+mods_beta <- person_mods(survforest_beta, basemod = "survreg", newdata = NULL, OOB = TRUE, 
+                          parallel = TRUE, init = c(6.7, 0))
+
+logLiks_beta <- sapply(1:nrow(ALSsurvdata), comp_loglik, mods = mods_beta, dat = ALSsurvdata, 
+                        basemod = "survreg", loglik = comp_loglik.wb)
+(logLik_rf_surv_beta <- sum(logLiks_beta))
+
+save(logLik_bmod_surv, logLik_rf_surv, logLik_rf_surv_alpha, logLik_rf_surv_beta,
+     file = "ALSsurv_logLiks.rda")
 
 
 rm(mods)
 rm(bmod)
+rm(mods_alpha)
+rm(mods_beta)
 
 
 
@@ -198,8 +236,11 @@ B <- 50
 mmbmod <- model.matrix(bmod_surv)
 rweib_scale <- exp(mmbmod %*% coef(bmod_surv))
 rweib_shape <- 1/bmod_surv$scale
+maxt <- max(ALSsurvdata$survival.time)
 
 
+## i: patient i
+## b: bootstrapsample b
 all_ynew <- ldply(1:nrow(ALSsurvdata), function(i) {
   
   sc <- rweib_scale[i]
@@ -208,13 +249,33 @@ all_ynew <- ldply(1:nrow(ALSsurvdata), function(i) {
   if(ALSsurvdata$cens[i] == 0) {
     censored <- stime > ALSsurvdata$survival.time[i]
     stime[censored] <- ALSsurvdata$survival.time[i]
-    cens <- as.numeric(!censored)
   } else {
-    cens <- rep(1, times = B)
+    censored <- stime > maxt
+    stime[censored] <- maxt
   }
+  
+  cens <- as.numeric(!censored)
+  stime < maxt
   
   data.frame(i = rep(i, B), b = 1:B, survival.time = stime, cens = cens)
 })
+
+ggplot(ALSsurvdata, aes(survival.time, color = factor(cens))) + 
+  geom_line(stat = "density") + geom_rug()
+
+fit <- survfit(Surv(survival.time, cens) ~ 1, data = ALSsurvdata) 
+plot(fit) 
+
+# check censoring percentage
+n <- nrow(ALSsurvdata)
+pc <- round(sum(ALSsurvdata$cens == 0) / n * 100, digits = 2)
+pc_bs <- round(daply(all_ynew, .(b), function(yn) sum(yn$cens == 0) / n * 100), digits = 2)
+message(
+  paste("Original data has",
+        pc, 
+        "% censoring. \nSimulated has", 
+        paste(pc_bs, collapse = "; "))
+)
 
 
 get_bslogliks_surv <- function(ynew) {

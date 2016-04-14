@@ -164,7 +164,8 @@ varimp <- function(forest, basemod = "lm", loglik = comp_loglik.lm,
                                                                 basemod = basemod,
                                                                 perm = z,
                                                                 OOB = OOB,
-                                                                offset = offset, ...))
+                                                                offset = offset, ...),
+                            mc.set.seed = FALSE)
   } else {
     loglik_perm <- sapply(zvars, function(z) get_loglik(forest = forest,
                                                         loglik = loglik,

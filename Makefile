@@ -1,4 +1,4 @@
-ORGDIR = ~/Documents/svn/WhatIf/WhatIf_forests/analysis
+ORGDIR = ~/Documents/svn/WhatIf/WhatIf_forests/analysis/
 
 BASEFILES = \
 	basis/personalised_models.R \
@@ -26,15 +26,20 @@ OTHER = \
 	$(DONE)
 
 
+
 # copying files from svn project
-basis: $(ORGDIR)/$(BASEFILES)
-	rsync -rt $(ORGDIR)/basis/ ./basis/ 
+basis: $(addprefix $(ORGDIR),$(BASEFILES))
+	rsync -rt $(addprefix $(ORGDIR),$(BASEFILES)) ./basis/ 
 
-$(RNWFILES): $(ORGDIR)/$@
-	rsync -t $(ORGDIR)/$@ ./$@
+$(RNWFILES): $(addprefix $(ORGDIR),$(RNWFILES))
+	rsync -t  $(addprefix $(ORGDIR),$(RNWFILES)) .
 
-$(OTHER): $(ORGDIR)/$@
-	rsync -t $(ORGDIR)/$@ $@
+$(OTHER): $(addprefix $(ORGDIR),$(OTHER))
+	rsync -t $(addprefix $(ORGDIR),$(OTHER)) .
+
+#.PHONY: test
+test: 
+	echo $(addprefix $(ORGDIR),$(RNWFILES))
 	
 #.PHONY: copy
 copy: $(RNWFILES) basis $(OTHER)

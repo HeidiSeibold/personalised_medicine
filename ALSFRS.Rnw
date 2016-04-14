@@ -26,7 +26,7 @@ read_chunk('ALSFRS_R.R')
 
 
 
-<<data, cache = ca, dependson = "setup">>=
+<<data, cache = TRUE>>=
 @
 
 
@@ -36,38 +36,28 @@ read_chunk('ALSFRS_R.R')
 
 
 \section{Compute random forest}
-<<forest, cache = ca, dependson = "data">>=
+<<forest, cache = TRUE, dependson = c("data", "fittingfunction")>>=
 @
 
 
 \section{Obtain personalised models}
-<<pm, out.width = "0.66\\textwidth", out.height = "0.33\\textwidth", fig.width=8, fig.height=4, cache = FALSE, dependson = "forest">>=
-@
-
-
-\section{Obtain log-Likelihoods}
-<<logLiks, cache = ca, dependson = "forest">>=
-@
-
-
-<<bootstrapLogliks, cache = ca, dependson = "data">>=
+<<pm, out.width = "0.66\\textwidth", out.height = "0.33\\textwidth", fig.width=8, fig.height=4, cache = FALSE>>=
 @
 
 
 \section{Variable importance}
-<<varimp, fig.height=11, cache = ca, depenson = "forest">>=
+<<varimp, fig.height=11, cache = FALSE>>=
 @
 
-%
-%\section{Rankplot}
-%<<rankplot, fig.height=11>>=
-%@
-%
-%
-%\section{Partial dependency plots}
-%<<pdplot, out.width = "0.5\\textwidth", out.height = "0.4\\textwidth">>=
-%@
-%
+
+\section{Obtain log-Likelihoods}
+<<logLiks, cache = TRUE, dependson = "forest">>=
+@
+
+
+<<bootstrapLogliks, cache = FALSE>>=
+@
+
 
 <<sessionInfo>>=
 sessionInfo()

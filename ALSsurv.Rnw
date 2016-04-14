@@ -36,7 +36,7 @@ read_chunk('ALSsurv_R.R')
 @
 
 \section{Compute random forest}
-<<surv_forest, cache = TRUE, dependson = c("surv_data", "surv_fittingfunction")>>=
+<<surv_forest, cache = FALSE>>=
 @
 
 
@@ -45,17 +45,18 @@ read_chunk('ALSsurv_R.R')
 @
 
 
-\section{Obtain log-Likelihoods}
-<<surv_logLiks, cache = TRUE, dependson = "surv_forest">>=
-@
-
-<<surv_bootstrapLogliks, dependson = c("surv_data", "surv_fittingfunction")>>=
-@
-
 \section{Variable importance}
-<<surv_varimp, depenson = c("surv_forest")>>=
+<<surv_varimp>>=
 @
 
+
+
+\section{Obtain log-Likelihoods}
+<<surv_logLiks, cache = FALSE>>=
+@
+
+<<surv_bootstrapLogliks>>=
+@
 %
 %\section{Rank plot}
 %<<surv_rankplot, fig.height = 11>>=
