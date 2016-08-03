@@ -48,7 +48,11 @@ prune_forest.tree <- function(b, forest, endpoint = "survival") {
     any(kids %in% terminals.toprune)
   }
   prune.here <- allids[sapply(allids, prune_here)]
-  
+  # nodeprune can not deal with first parent then child 
+  # Error: inherits(node, "partynode") is not TRUE
+  prune.here <- prune.here[order(prune.here, decreasing = TRUE)] 
+ 
+ 
   pruned.tree <- nodeprune(tree.node, prune.here)
   return(pruned.tree)
   

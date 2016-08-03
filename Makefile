@@ -2,6 +2,7 @@ ORGDIR = ~/Documents/svn/WhatIf/WhatIf_forests/analysis/
 
 BASEFILES = \
 	basis/personalised_models.R \
+	basis/pruning.R \
 	basis/variable_importance.R \
 	basis/dependence_plots.R \
 	$(DONE)
