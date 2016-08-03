@@ -49,7 +49,7 @@ dependenceplot <- function(variable, treatment = "RiluzoleYes", pd, nmean = FALS
         }
         
         p <- ggplot(data = pd1, aes_string(x = variable, y = "treatment")) + 
-            # geom_smooth(fill = NA, aes(color = "smooth curve")) + 
+            geom_smooth(fill = NA, aes(color = "smooth curve")) +
             ylim(betarange) + 
             scale_size_continuous(range = rg, breaks = bk, name = "number of \nobservations") + 
             ylab(parse(text = paste(treatment_symbol, "(", variable, ")"))) +

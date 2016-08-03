@@ -77,9 +77,7 @@ Z <- names(train)[!(names(train) %in% c("y", "a"))]
 cfm <- as.formula(paste("y + a ~", paste(Z, collapse = "+")))
 
 lmforest <-  cforest(cfm, data = train, ytrafo = lmf, ntree = 100, cores = 1, 
-                     perturb = list(replace = FALSE),
-                     control = ctree_control(teststat = "quad",
-                                testtype = "Univ", mincriterion = 0, minbucket = 20))
+                       perturb = list(replace = FALSE))
 pmods <- person_mods(object = lmforest, basemod = "lm", newdata = train[1:5,], 
                      OOB = FALSE, parallel = TRUE)
 
@@ -235,6 +233,43 @@ dependenceplot.sim <- function(variable, treatment) {
 }
 lapply(Z, dependenceplot.sim, treatment = "aA")
 
+@
+
+
+\section{Comparison to regular forest}
+<<cforest>>=
+
+set.seed(22)
+condforest <- cforest(y ~ ., data = train, ntree = 100, cores = 50, 
+                      perturb = list(replace = FALSE))
+t0 <- t1 <- train
+t1$a[t1$a == "C"] <- "A"
+t0$a[t1$a == "A"] <- "C"
+
+trt_eff_condforest <- predict(condforest, newdata = t1, type = "response") -
+  predict(condforest, newdata = t0, type = "response")
+
+
+
+pmods <- person_mods(object = lmforest, basemod = "lm", newdata = train, 
+                     OOB = FALSE, parallel = TRUE)
+
+trt_eff_pmods <- sapply(pmods, coef)["aA", ]
+
+
+trt_eff <- data.frame(trt_eff = c(trt_eff_pmods, trt_eff_condforest), 
+                      type = rep(c("pmods", "cforest"), each = nrow(train)),
+                      z1 = rep(train$z1, times = 2))
+
+ggplot(data = trt_eff) +
+  geom_line(aes(x = z1, y = (0.2 + beta * cos(z1)))) + 
+  geom_point(aes(x = z1, y = trt_eff, color = type)) +
+  ylab(expression(beta(z[1]))) +  xlab(bquote(z[.(gsub("z", "", Z[1]))])) 
+
+plot(train$z1, trt_eff_pmods)
+points(train$z1, trt_eff_condforest, col = 2)
+
+plot(trt_eff_pmods, trt_eff_condforest)
 @
 
 \end{document}
