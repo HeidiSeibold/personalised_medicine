@@ -7,7 +7,7 @@
 ##' @param b index of tree
 ##' @param forest forest
 ##' @param endpoint character string classifying the endpoint variable (e.g. "survival")
-prune_forest.tree <- function(b, forest, endpoint = "survival") {
+prune_forest.tree <- function(b, forest, endpoint = "survival", treatmentvar = "Riluzole", minobs = 5) {
   
   alldata <- forest$data
   stopifnot(nrow(alldata) > 0)
@@ -28,13 +28,13 @@ prune_forest.tree <- function(b, forest, endpoint = "survival") {
   # which terminal node should be cut off?
   if(endpoint == "survival") {
     needs.pruning <- function(d) {
-      tb <- table(d[, c("cens", "Riluzole")])
-      (!("1" %in% rownames(tb)) || any(tb["1", ] <  5) || sum(tb["1", ]) < 10) 
+      tb <- table(d[, c("cens", treatmentvar)])
+      (!("1" %in% rownames(tb)) || any(tb["1", ] <  minobs) || sum(tb["1", ]) < minobs * 2) 
     }
   } else {
     needs.pruning <- function(d) {
-      tb <- table(d[, "Riluzole"])
-      any(tb < 5)
+      tb <- table(d[, treatmentvar])
+      any(tb < minobs)
     }
   }
   
@@ -51,8 +51,8 @@ prune_forest.tree <- function(b, forest, endpoint = "survival") {
   # nodeprune can not deal with first parent then child 
   # Error: inherits(node, "partynode") is not TRUE
   prune.here <- prune.here[order(prune.here, decreasing = TRUE)] 
- 
- 
+  
+  
   pruned.tree <- nodeprune(tree.node, prune.here)
   return(pruned.tree)
   
@@ -65,10 +65,11 @@ prune_forest.tree <- function(b, forest, endpoint = "survival") {
 ##' 
 ##' @param forest forest
 ##' @param endpoint character string classifying the endpoint variable (e.g. "survival")
-prune_forest <- function(forest, endpoint = "survival") {
+prune_forest <- function(forest, endpoint = "survival", treatmentvar = "Riluzole", minobs = 5) {
   
   forest.pruned <- lapply(1:length(forest$nodes), prune_forest.tree, 
-                          forest = forest, endpoint = endpoint)
+                          forest = forest, endpoint = endpoint, 
+                          treatmentvar = treatmentvar, minobs = minobs)
   
   #copied from cforest
   ret <- partykit:::constparties(nodes = forest.pruned, 

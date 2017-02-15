@@ -18,6 +18,7 @@ theme_set(theme_bw(base_size = 18))
 source("basis/personalised_models.R")
 source("basis/variable_importance.R")
 source("basis/dependence_plots.R")
+source("basis/pruning.R")
 
 set.seed(123)
 @
@@ -35,10 +36,10 @@ sim_data <- function(n = 500, p = 10, beta = 3, sd = 1){
   ztemp <- rmvnorm(n, sigma = sigma)
   z <- (pnorm(ztemp) * 2 * pi) - pi  
   
-#   z <- matrix(runif(p * n, min = -pi, max = pi), nrow = n)
+  #   z <- matrix(runif(p * n, min = -pi, max = pi), nrow = n)
   colnames(z) <- paste0("z", 1:ncol(z))
   z1 <- z[,1]
-   
+  
   y <- 1.9 + 0.2 * (a %in% "A") + beta * cos(z1) * (a %in% "A") + rnorm(n, 0, sd)
   
   data.frame(y = y, a = a, z)
@@ -73,16 +74,79 @@ lmf <- function(data, weights, parm = c(1,2)) {
 <<sind_mods>>=
 beta <- 3
 train <- sim_data(p = 10, beta = beta, n = 600)
+test <- sim_data(p = 10, beta = beta, n = 600)
 Z <- names(train)[!(names(train) %in% c("y", "a"))]
 cfm <- as.formula(paste("y + a ~", paste(Z, collapse = "+")))
 
 lmforest <-  cforest(cfm, data = train, ytrafo = lmf, ntree = 100, cores = 1, 
-                       perturb = list(replace = FALSE))
-pmods <- person_mods(object = lmforest, basemod = "lm", newdata = train[1:5,], 
+                     perturb = list(replace = FALSE))
+pmods <- person_mods(object = lmforest, basemod = "lm", newdata = test, 
                      OOB = FALSE, parallel = TRUE)
+@
 
-(pcoefs <- t(sapply(pmods, coef)))
+\section{Variable importance}
 
+\Sexpr{knit_child("variable_importance.Rnw")}
+
+<<svarimp, out.width = "0.7\\textwidth", out.height = "0.7\\textwidth">>=
+###### variable importance ######
+lmforest_pruned <- prune_forest(lmforest, endpoint = "other", treatmentvar = "a", minobs = 2)
+VI <- varimp(forest = lmforest_pruned, loglik = comp_loglik.lm, 
+             basemod = "lm", OOB = TRUE, parallel = TRUE)
+VI
+
+text.z <- sapply(Z, function(x) bquote(z[.(gsub("z", "", x))]))
+VI$variable <- factor(VI$variable, levels = Z)
+
+save(VI, file = "sim_varimp.rda")
+
+ggplot(VI, aes(y = VI, x = variable)) + geom_bar(stat = "identity", width = .1) + 
+  coord_flip() + scale_x_discrete(labels = text.z) +
+  theme(panel.grid.major.y = element_blank())
+
+@
+
+
+\section{Comparison to regular forest}
+<<cforest>>=
+
+set.seed(22)
+condforest <- cforest(y ~ ., data = train, ntree = 100, cores = 50, 
+                      perturb = list(replace = FALSE))
+t0 <- t1 <- test
+t1$a[t1$a == "C"] <- "A"
+t0$a[t1$a == "A"] <- "C"
+
+trt_eff_condforest <- predict(condforest, newdata = t1, type = "response") -
+  predict(condforest, newdata = t0, type = "response")
+
+
+trt_eff_pmods <- sapply(pmods, coef)["aA", ]
+
+
+trt_eff <- data.frame(trt_eff = c(trt_eff_pmods, trt_eff_condforest), 
+                      type = rep(c("pmods", "cforest"), each = nrow(train)),
+                      z1 = rep(test$z1, times = 2))
+
+save(trt_eff, file = "sim_compareforests.rda")
+
+
+p <- ggplot(data = trt_eff) +
+  geom_line(aes(x = z1, y = (0.2 + beta * cos(z1)))) + 
+  geom_point(aes(x = z1, y = trt_eff, color = type), alpha = 0.6) +
+  ylab(expression(beta(z[1]))) +  xlab(bquote(z[.(gsub("z", "", Z[1]))])) 
+p
+@
+
+
+<<pruned_forest>>=
+pmods_pruned <- person_mods(object = lmforest_pruned, basemod = "lm", newdata = test, 
+                            OOB = FALSE, parallel = TRUE)
+
+trt_eff_pruned <- data.frame(trt_eff = sapply(pmods_pruned, coef)["aA", ], 
+                             type = rep(c("pmods_pruned"), each = nrow(train)),
+                             z1 = test$z1)
+p + geom_point(data = trt_eff_pruned, aes(x = z1, y = trt_eff, color = type), alpha = 0.6)
 @
 
 
@@ -106,7 +170,7 @@ sim_wi <- function(i, data = NULL, n = 600, m = 600, p = 10, beta = 3,
     train <- data$train
     test <- data$test
   }
-    
+  
   Z <- names(train)[!(names(train) %in% c("y", "a"))]
   
   
@@ -168,37 +232,7 @@ ggplot(logliks_gg, aes(x = nam, y = loglik)) +
 @
 
 
-\section{Variable importance}
 
-\Sexpr{knit_child("variable_importance.Rnw")}
-
-<<svarimp, out.width = "0.7\\textwidth", out.height = "0.7\\textwidth">>=
-###### variable importance ######
-
-## beta = 3
-# train <- sim_data(p = 10, beta = 3, n = 500)
-# Z <- names(train)[!(names(train) %in% c("y", "a"))]
-# cfm <- as.formula(paste("y + a ~", paste(Z, collapse = "+")))
-# lmforest <-  cforest(cfm, data = train, ytrafo = lmf, ntree = 100, cores = 1, 
-#                      perturb = list(replace = FALSE))
-
-VI <- varimp(forest = lmforest, loglik = comp_loglik.lm, 
-             basemod = "lm", OOB = TRUE, parallel = TRUE)
- 
-# VI <- varimp(variables = Z, forest = lmforest, loglik_forest = NULL, 
-#              basemod = "lm", loglik = comp_loglik.lm)
-VI
-
-text.z <- sapply(Z, function(x) bquote(z[.(gsub("z", "", x))]))
-VI$variable <- factor(VI$variable, levels = Z)
-
-save(VI, file = "sim_varimp.rda")
-
-ggplot(VI, aes(y = VI, x = variable)) + geom_bar(stat = "identity", width = .1) + 
-  coord_flip() + scale_x_discrete(labels = text.z) +
-  theme(panel.grid.major.y = element_blank())
-
-@
 
 \section{Partial dependence plots}
 With out of sample data.
@@ -214,10 +248,10 @@ ggplot(data = train, aes(x = z1, y = (0.2 + beta * cos(z1)) * (a %in% "A"), grou
 # personalized models
 library(plyr)
 pd <- ldply(1:length(logliks.pm), 
-               function(i) {
-                 logliks.pm[[i]]$person.mods$iteration <- i
-                 return(logliks.pm[[i]]$person.mods)
-                 })
+            function(i) {
+              logliks.pm[[i]]$person.mods$iteration <- i
+              return(logliks.pm[[i]]$person.mods)
+            })
 
 pd$iteration <- as.factor(pd$iteration)
 
@@ -226,50 +260,18 @@ save(Z, pd, file = "sim_dependenceplotdat.rda")
 
 dependenceplot.sim <- function(variable, treatment) {
   ggplot(data = pd, aes_string(x = variable, y = treatment)) + 
-        geom_point(alpha = 0.1) + 
-        xlab(bquote(z[.(gsub("z", "", variable))])) + 
-        ylab(bquote(bar(beta)(z[.(gsub("z", "", variable))])))+ 
-        xlim(-pi, pi) + ylim(-pi, pi)              
+    geom_point(alpha = 0.1) + 
+    xlab(bquote(z[.(gsub("z", "", variable))])) + 
+    ylab(bquote(bar(beta)(z[.(gsub("z", "", variable))])))+ 
+    xlim(-pi, pi) + ylim(-pi, pi)              
 }
-lapply(Z, dependenceplot.sim, treatment = "aA")
+p <- lapply(Z, dependenceplot.sim, treatment = "aA")
+
+p[[1]] + geom_line(aes(x = z1, y = (0.2 + beta * cos(z1)))) 
+p[[2]]
 
 @
 
 
-\section{Comparison to regular forest}
-<<cforest>>=
-
-set.seed(22)
-condforest <- cforest(y ~ ., data = train, ntree = 100, cores = 50, 
-                      perturb = list(replace = FALSE))
-t0 <- t1 <- train
-t1$a[t1$a == "C"] <- "A"
-t0$a[t1$a == "A"] <- "C"
-
-trt_eff_condforest <- predict(condforest, newdata = t1, type = "response") -
-  predict(condforest, newdata = t0, type = "response")
-
-
-
-pmods <- person_mods(object = lmforest, basemod = "lm", newdata = train, 
-                     OOB = FALSE, parallel = TRUE)
-
-trt_eff_pmods <- sapply(pmods, coef)["aA", ]
-
-
-trt_eff <- data.frame(trt_eff = c(trt_eff_pmods, trt_eff_condforest), 
-                      type = rep(c("pmods", "cforest"), each = nrow(train)),
-                      z1 = rep(train$z1, times = 2))
-
-ggplot(data = trt_eff) +
-  geom_line(aes(x = z1, y = (0.2 + beta * cos(z1)))) + 
-  geom_point(aes(x = z1, y = trt_eff, color = type)) +
-  ylab(expression(beta(z[1]))) +  xlab(bquote(z[.(gsub("z", "", Z[1]))])) 
-
-plot(train$z1, trt_eff_pmods)
-points(train$z1, trt_eff_condforest, col = 2)
-
-plot(trt_eff_pmods, trt_eff_condforest)
-@
 
 \end{document}

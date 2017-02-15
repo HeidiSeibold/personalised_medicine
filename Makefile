@@ -16,6 +16,7 @@ INFOS = \
 
 RNWFILES = \
 	   simulation.Rnw \
+	   simulation2.Rnw \
 	   ALSFRS.Rnw \
 	   ALSsurv.Rnw \
 	   $(DONE)
@@ -50,6 +51,11 @@ copy: $(RNWFILES) basis $(OTHER)
 simulation.pdf: $(BASEFILES) $(INFOS) simulation.Rnw
 	R CMD Sweave simulation.Rnw
 	pdflatex simulation.tex
+
+simulation2.pdf: $(BASEFILES) $(INFOS) simulation2.Rnw
+	R CMD Sweave simulation2.Rnw
+	pdflatex simulation2.tex
+
 
 ALSFRS.pdf: $(BASEFILES) ALSFRS.Rnw ALSFRS_R.R  
 	R CMD Sweave ALSFRS.Rnw
