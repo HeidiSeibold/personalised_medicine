@@ -3,7 +3,10 @@
 
 \begin{document}
 %\VignetteEngine{knitr::knitr}
+
 <<setup>>=
+rm(list = ls())
+
 library("knitr")
 opts_chunk$set(cache = FALSE, echo = TRUE, message = FALSE)
 
@@ -66,89 +69,92 @@ lmf <- function(data, weights, parm = c(1,2)) {
 }
 @
 
-
-\section{Computing individualised models}
-
-\Sexpr{knit_child("personalised_models.Rnw")}
-
+ 
+ \section{Computing individualised models}
+ 
+ \Sexpr{knit_child("personalised_models.Rnw")}
+ 
 <<sind_mods>>=
-beta <- 3
-train <- sim_data(p = 10, beta = beta, n = 600)
-test <- sim_data(p = 10, beta = beta, n = 600)
-Z <- names(train)[!(names(train) %in% c("y", "a"))]
-cfm <- as.formula(paste("y + a ~", paste(Z, collapse = "+")))
-
-lmforest <-  cforest(cfm, data = train, ytrafo = lmf, ntree = 100, cores = 1, 
-                     perturb = list(replace = FALSE))
-pmods <- person_mods(object = lmforest, basemod = "lm", newdata = test, 
-                     OOB = FALSE, parallel = TRUE)
-@
-
-\section{Variable importance}
-
-\Sexpr{knit_child("variable_importance.Rnw")}
-
-<<svarimp, out.width = "0.7\\textwidth", out.height = "0.7\\textwidth">>=
-###### variable importance ######
-lmforest_pruned <- prune_forest(lmforest, endpoint = "other", treatmentvar = "a", minobs = 2)
-VI <- varimp(forest = lmforest_pruned, loglik = comp_loglik.lm, 
-             basemod = "lm", OOB = TRUE, parallel = TRUE)
-VI
-
-text.z <- sapply(Z, function(x) bquote(z[.(gsub("z", "", x))]))
-VI$variable <- factor(VI$variable, levels = Z)
-
-save(VI, file = "sim_varimp.rda")
-
-ggplot(VI, aes(y = VI, x = variable)) + geom_bar(stat = "identity", width = .1) + 
-  coord_flip() + scale_x_discrete(labels = text.z) +
-  theme(panel.grid.major.y = element_blank())
-
-@
-
-
-\section{Comparison to regular forest}
-<<cforest>>=
-
-set.seed(22)
-condforest <- cforest(y ~ ., data = train, ntree = 100, cores = 50, 
+ beta <- 3
+ train <- sim_data(p = 10, beta = beta, n = 600)
+ test <- sim_data(p = 10, beta = beta, n = 600)
+ Z <- names(train)[!(names(train) %in% c("y", "a"))]
+ cfm <- as.formula(paste("y + a ~", paste(Z, collapse = "+")))
+ 
+ lmforest <-  cforest(cfm, data = train, ytrafo = lmf, ntree = 100, cores = 1, 
                       perturb = list(replace = FALSE))
-t0 <- t1 <- test
-t1$a[t1$a == "C"] <- "A"
-t0$a[t1$a == "A"] <- "C"
-
-trt_eff_condforest <- predict(condforest, newdata = t1, type = "response") -
-  predict(condforest, newdata = t0, type = "response")
-
-
-trt_eff_pmods <- sapply(pmods, coef)["aA", ]
-
-
-trt_eff <- data.frame(trt_eff = c(trt_eff_pmods, trt_eff_condforest), 
-                      type = rep(c("pmods", "cforest"), each = nrow(train)),
-                      z1 = rep(test$z1, times = 2))
-
-save(trt_eff, file = "sim_compareforests.rda")
-
-
-p <- ggplot(data = trt_eff) +
-  geom_line(aes(x = z1, y = (0.2 + beta * cos(z1)))) + 
-  geom_point(aes(x = z1, y = trt_eff, color = type), alpha = 0.6) +
-  ylab(expression(beta(z[1]))) +  xlab(bquote(z[.(gsub("z", "", Z[1]))])) 
-p
+ pmods <- person_mods(object = lmforest, basemod = "lm", newdata = test, 
+                      OOB = FALSE, parallel = TRUE)
 @
-
-
+ 
+ \section{Variable importance}
+ 
+ \Sexpr{knit_child("variable_importance.Rnw")}
+ 
+<<svarimp, out.width = "0.7\\textwidth", out.height = "0.7\\textwidth">>=
+ ###### variable importance ######
+ lmforest_pruned <- prune_forest(lmforest, endpoint = "other", 
+                                 treatmentvar = "a", minobs = 2)
+ VI <- varimp(forest = lmforest_pruned, loglik = comp_loglik.lm, 
+              basemod = "lm", OOB = TRUE, parallel = TRUE)
+ VI
+ 
+ text.z <- sapply(Z, function(x) bquote(z[.(gsub("z", "", x))]))
+ VI$variable <- factor(VI$variable, levels = Z)
+ 
+ save(VI, file = "sim_varimp.rda")
+ 
+ ggplot(VI, aes(y = VI, x = variable)) + geom_bar(stat = "identity", width = .1) + 
+   coord_flip() + scale_x_discrete(labels = text.z) +
+   theme(panel.grid.major.y = element_blank())
+ 
+@
+ 
+ 
+ \section{Comparison to regular forest}
+<<cforest>>=
+ 
+ set.seed(22)
+ fm_cf <- as.formula("y ~ . + .:a")
+ condforest <- cforest(fm_cf, data = train, ntree = 100, cores = 50, 
+                       perturb = list(replace = FALSE))
+ 
+ t0 <- t1 <- test
+ t1$a[t1$a == "C"] <- "A"
+ t0$a[t1$a == "A"] <- "C"
+ 
+ trt_eff_condforest <- predict(condforest, newdata = t1, type = "response") -
+   predict(condforest, newdata = t0, type = "response")
+ 
+ 
+ trt_eff_pmods <- sapply(pmods, coef)["aA", ]
+ 
+ 
+ trt_eff <- data.frame(trt_eff = c(trt_eff_pmods, trt_eff_condforest), 
+                       type = rep(c("pmods", "cforest"), each = nrow(train)),
+                       z1 = rep(test$z1, times = 2))
+ 
+ save(trt_eff, file = "sim_compareforests.rda")
+ 
+ 
+ p <- ggplot(data = trt_eff) +
+   geom_line(aes(x = z1, y = (0.2 + beta * cos(z1)))) + 
+   geom_point(aes(x = z1, y = trt_eff, color = type), alpha = 0.6) +
+   ylab(expression(beta(z[1]))) +  xlab(bquote(z[.(gsub("z", "", Z[1]))])) 
+ p
+@
+ 
+ 
 <<pruned_forest>>=
-pmods_pruned <- person_mods(object = lmforest_pruned, basemod = "lm", newdata = test, 
-                            OOB = FALSE, parallel = TRUE)
-
-trt_eff_pruned <- data.frame(trt_eff = sapply(pmods_pruned, coef)["aA", ], 
-                             type = rep(c("pmods_pruned"), each = nrow(train)),
-                             z1 = test$z1)
-p + geom_point(data = trt_eff_pruned, aes(x = z1, y = trt_eff, color = type), alpha = 0.6)
+ pmods_pruned <- person_mods(object = lmforest_pruned, basemod = "lm", newdata = test, 
+                             OOB = FALSE, parallel = TRUE)
+ 
+ trt_eff_pruned <- data.frame(trt_eff = sapply(pmods_pruned, coef)["aA", ], 
+                              type = rep(c("pmods_pruned"), each = nrow(train)),
+                              z1 = test$z1)
+ p + geom_point(data = trt_eff_pruned, aes(x = z1, y = trt_eff, color = type), alpha = 0.6)
 @
-
+ 
 
 \section{Function which computes log-likelihoods for simulated data}
 
@@ -160,7 +166,7 @@ p + geom_point(data = trt_eff_pruned, aes(x = z1, y = trt_eff, color = type), al
 ##' @param i unused
 ##' @param data list of 2 list(train, test). If NULL training data of size n and test data of size m are obtained.
 sim_wi <- function(i, data = NULL, n = 600, m = 600, p = 10, beta = 3,
-                   person.mods = FALSE){
+                   person.mods = FALSE, comp.cforest = FALSE){
   
   if(is.null(data)) {
     data <- sim_data(n = (n + m), p = p, beta = beta)
@@ -194,10 +200,35 @@ sim_wi <- function(i, data = NULL, n = 600, m = 600, p = 10, beta = 3,
   loglikf <- sum(logLiksf)
   
   
-  if (person.mods == TRUE) {
+  if (person.mods) {
     pm <- cbind(t(sapply(mods, coef)), test)
-    return(list(logliks = c(loglik1, loglik2, loglikf),
-                person.mods = pm))
+    
+    if(comp.cforest) {
+      condforest1 <- cforest(y ~ ., data = train, ntree = 100, cores = 50, 
+                            perturb = list(replace = FALSE))
+      fm_cf <- as.formula("y ~ . + .:a")
+      condforest2 <- cforest(fm_cf, data = train, ntree = 100, cores = 50, 
+                            perturb = list(replace = FALSE))
+      t0 <- t1 <- test
+      t1$a[t1$a == "C"] <- "A"
+      t0$a[t1$a == "A"] <- "C"
+      
+      trt_eff_condforest1 <- predict(condforest1, newdata = t1, type = "response") -
+        predict(condforest1, newdata = t0, type = "response")
+      trt_eff_condforest2 <- predict(condforest2, newdata = t1, type = "response") -
+        predict(condforest2, newdata = t0, type = "response")
+      
+      trt.eff_cforest1 <- cbind(trt_eff = trt_eff_condforest1, test)
+      trt.eff_cforest2 <- cbind(trt_eff = trt_eff_condforest2, test)
+
+      return(list(logliks = c(loglik1, loglik2, loglikf),
+                  person.mods = pm,
+                  trt.eff_cforest1 = trt.eff_cforest1,
+                  trt.eff_cforest2 = trt.eff_cforest2))
+    } else{
+      return(list(logliks = c(loglik1, loglik2, loglikf),
+                  person.mods = pm))
+    }
   } else {
     return(c(loglik1, loglik2, loglikf))
   }
@@ -209,10 +240,11 @@ sim_wi <- function(i, data = NULL, n = 600, m = 600, p = 10, beta = 3,
 
 \section{Log-likelihoods for simulated data for the three methods}
 
-\Sexpr{knit_child("log_likelihoods.Rnw")}
+%\Sexpr{knit_child("log_likelihoods.Rnw")}
 
 <<slogliks, out.width = "0.6\\textwidth", out.height = "0.6\\textwidth">>=
-logliks.pm <- lapply(1:100, sim_wi, person.mods = TRUE)
+set.seed(223)
+logliks.pm <- lapply(1:100, sim_wi, person.mods = TRUE, comp.cforest = TRUE)
 logliks <- t(sapply(logliks.pm, function(x) x$logliks))
 llnames <- c("incorrect model", "correct model", "model based forest")
 colnames(logliks) <- llnames
@@ -232,6 +264,37 @@ ggplot(logliks_gg, aes(x = nam, y = loglik)) +
 @
 
 
+\section{Comparison forests in simulation}
+<<scompare_error>>=
+msefun <- function(error) {
+  mean(error^2)
+}
+
+get_error <- function(x, df = FALSE, beta = 3) {
+  
+  trt_eff <- x$person.mods[, c("aA", "z1")]
+  names(trt_eff)[names(trt_eff) == "aA"] <- "trt_eff"
+  trt_eff$type <- "pmods"
+  trt_eff <- rbind(trt_eff,
+                   cbind(x$trt.eff_cforest1[, c("trt_eff", "z1")], type = "cforest1"),
+                   cbind(x$trt.eff_cforest2[, c("trt_eff", "z1")], type = "cforest2"))
+  
+  trt_eff$true <- (0.2 + beta * cos(trt_eff$z1))
+  trt_eff$err <- trt_eff$trt_eff - trt_eff$true
+  
+  if(df) {
+    return(trt_eff)
+  } else {
+    c(mse_cforest1 = msefun(trt_eff$err[trt_eff$type == "cforest1"]),
+      mse_cforest2 = msefun(trt_eff$err[trt_eff$type == "cforest2"]),
+      mse_pmods = msefun(trt_eff$err[trt_eff$type == "pmods"]))
+  }
+}
+
+
+mse <- sapply(logliks.pm, get_error)
+save(mse, file = "sim_comparemse.rda")
+@
 
 
 \section{Partial dependence plots}
