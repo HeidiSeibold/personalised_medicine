@@ -1,6 +1,14 @@
 # Personalised Medicine
 
-This repository contains the code to our paper on personalised medicine.
+This repository contains the code to our [paper on personalised medicine](http://journals.sagepub.com/doi/10.1177/0962280217693034).
+
+**Individual treatment effect prediction for amyotrophic lateral sclerosis patients**   
+*Heidi Seibold, Achim Zeileis, Torsten Hothorn*   
+Statistical Methods in Medical Research, 2017.
+
+> :bangbang: **There is now an R package which can do the analyses in a much simpler way** :bangbang:   
+> Package: [model4you](https://CRAN.R-project.org/package=model4you)   
+> Code to reproduce paper available on [R-Forge](https://r-forge.r-project.org/scm/viewvc.php/pkg/model4you/inst/reproducing_papers/?root=partykit)
 
 We propose model-based random forests as a method to detect
 similarities between patients with respect to their treatment effect
