@@ -47,7 +47,7 @@ predict the treatment effect of a future patient and thus enhance treatment
 decisions.
 
 We apply our method to the PRO-ACT database 
-([Atassi et al, 2014](http://dx.doi.org/10.1212/WNL.0000000000000951)) containing
+([Atassi et al, 2014](https://doi.org/10.1212/WNL.0000000000000951)) containing
 fully de-identified data of ALS patients from several clinical trials. We 
 are primarily interested in the effect of Riluzole on the survival of ALS
 patients. 
@@ -57,7 +57,7 @@ patients.
 Model-based recursive partitioning can be used as a method to detect subgroups
 with differing treatment effects (Seibold et al, 2015 :clock5:).  The tree is grown
 based on the correlation between patient characteristics and the score function
-of a given base model (see [Zeileis et al, 2008](http://dx.doi.org/10.1198/106186008X319331)).  
+of a given base model (see [Zeileis et al, 2008](https://doi.org/10.1198/106186008X319331)).  
 In the context of subgroup
 detection for differential treatment effects the primary endpoint in the base
 model is some health measurement or the survival time and the covariate is the
@@ -76,7 +76,7 @@ patients with respect to expected outcome and, more importantly, treatment
 effect. So in a second step we compute the similarity between patients.  The
 similarity of a patient i to any patient given in the learning data is
 defined as the number of times the patients are assigned to the same subgroup
-in the trees ([Hothorn et al, 2004](http://dx.doi.org/10.1002/sim.1593)).  
+in the trees ([Hothorn et al, 2004](https://doi.org/10.1002/sim.1593)).  
 Finally the expected treatment effect for this
 new patient is computed using the base model and a weighted version of the
 learning data.  The weights that are used for the model are the similarities.
